@@ -97,10 +97,13 @@ real `org.freedesktop.login1` (system bus) and `org.freedesktop.ScreenSaver`
 The daemon has two ways to learn the screen went off:
 
 1. **Primary — DRM poll:** `/sys/class/drm/<conn>/dpms` flips `On`→`Off` when the
-   compositor disables the connector. This is kernel atomic-KMS behaviour
-   (`drm_atomic_helper_update_legacy_modeset_state()` syncs the legacy property),
-   not compositor-specific. Verified working on **amdgpu under KWin** (see the
-   host checklist in [INSTALL.md] / the daemon's own logs).
+   compositor disables the connector. Verified working on the **NVIDIA
+   proprietary driver (RTX 3080 Ti) under KWin / Wayland** — that's the author's
+   daily setup. For the in-tree atomic drivers (amdgpu, i915, nouveau) the kernel
+   syncs this legacy property itself
+   (`drm_atomic_helper_update_legacy_modeset_state()`), so it isn't
+   compositor- or driver-specific; the weston-on-virtio VM test (tier 3b)
+   confirms it on a non-KWin, non-NVIDIA stack.
 2. **Fallback — `screensaver_dbus: true`:** react to
    `org.freedesktop.ScreenSaver.ActiveChanged` on the session bus.
 

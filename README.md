@@ -35,8 +35,9 @@ desktop / GPU" is largely unverified. Here's the honest state:
 
 **Verified end-to-end on real hardware:**
 
-- CachyOS (Arch), **KDE Plasma 6 / Wayland**, AMD GPU (amdgpu), one **LG C2**
-  (OLED42C2PUA, webOS 22), TV on the same subnet as the PC.
+- CachyOS (Arch), **KDE Plasma 6 / Wayland**, **NVIDIA RTX 3080 Ti** (proprietary
+  `nvidia` driver), one **LG C2** (OLED42C2PUA, webOS 22), TV on the same subnet
+  as the PC.
 - Idle screen-blank → panel off → wake; **suspend** → TV powers off; **resume**
   → Wake-on-LAN brings it back; **shutdown** → TV powers off.
 - Network discovery, pairing, and the primary DRM `dpms` trigger.
@@ -57,7 +58,7 @@ desktop / GPU" is largely unverified. Here's the honest state:
 | Area | Notes |
 | --- | --- |
 | **GNOME / Mutter**, **Sway / wlroots** on real hardware | Expected to work. Sway has no `org.freedesktop.ScreenSaver`, so it relies solely on the DRM trigger. |
-| **NVIDIA / Intel GPUs** | Only amdgpu verified. The trigger reads a kernel sysfs node, so it *should* be driver-agnostic. |
+| **AMD / Intel GPUs**, **nouveau** | Verified on the NVIDIA proprietary driver. The trigger reads a kernel sysfs `dpms` node that the in-tree atomic drivers maintain too, so it *should* be driver-agnostic. |
 | **Other webOS versions / models** | Only the C2 (webOS 22). Older (webOS 3–6) and newer (C3/C4/G-series) unverified. |
 | **Other distros / non-systemd init** | systemd `--user` is required; nothing else is supported. |
 
