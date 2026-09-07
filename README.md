@@ -1,0 +1,167 @@
+# webOS Companion
+
+Make an LG WebOS TV behave like a normal PC monitor on Linux: follow the display
+power state, so the panel goes off when the desktop blanks the screen and the TV
+powers down when the machine suspends or shuts down — for OLED burn-in
+protection and a bit of power saving.
+
+A Linux port of [**LGTV Companion**](https://github.com/JPersson77/LGTVCompanion)
+(Windows) — see [Credits](#credits).
+
+> **Status: early (0.1).** Verified end-to-end on one setup (KDE Plasma 6 /
+> Wayland, one LG C2). Lots of common configurations are untested — see
+> [Project status](#project-status--whats-tested) below. **Feedback is very
+> welcome and genuinely useful**, including "it just works on X".
+
+| When your desktop… | …the TV does |
+| --- | --- |
+| turns the screen off to save power (idle blank) | `turnOffScreen` — panel black, TV stays powered and on the network; wake is instant |
+| turns the screen back on | `turnOnScreen` (reconnect + Wake-on-LAN first if the TV dropped off) |
+| **suspends / sleeps** | `system/turnOff` — real power-down |
+| **resumes** | Wake-on-LAN, reconnect, restore the screen state |
+| **shuts down / reboots** | `system/turnOff` |
+
+User-idle handling is left to the desktop. A bare session lock is deliberately
+*not* a trigger (the screen-blank that usually follows one is).
+
+## Project status — what's tested
+
+This is a one-person 0.1 built and run against a single real setup. It was
+**"vibe coded" with [Claude Code](https://claude.com/claude-code)** — the design
+decisions and real-hardware testing are mine, but the bulk of the implementation
+was written by an LLM. Read the code before trusting it on an expensive panel.
+The daemon logic is well covered by tests, but "does it behave on *your* TV /
+desktop / GPU" is largely unverified. Here's the honest state:
+
+**Verified end-to-end on real hardware:**
+
+- CachyOS (Arch), **KDE Plasma 6 / Wayland**, AMD GPU (amdgpu), one **LG C2**
+  (OLED42C2PUA, webOS 22), TV on the same subnet as the PC.
+- Idle screen-blank → panel off → wake; **suspend** → TV powers off; **resume**
+  → Wake-on-LAN brings it back; **shutdown** → TV powers off.
+- Network discovery, pairing, and the primary DRM `dpms` trigger.
+
+**Tested, but not against a real TV:**
+
+- Full unit suite (83 tests) on **Python 3.11–3.14**, on Arch, Debian 12,
+  Ubuntu 24.04, Fedora 41, openSUSE Tumbleweed (D-Bus mocked, fake TV server).
+- Real host D-Bus / DRM paths and live TV *discovery* from Debian / Ubuntu /
+  Fedora / openSUSE userspace (tier 2 in [TESTING.md](TESTING.md)).
+- A non-KWin compositor (**weston**, in a VM) flips `/sys/class/drm/*/dpms` on
+  idle exactly as KWin does — so the DRM trigger isn't KDE-specific.
+
+**Not yet tested — reports especially wanted:**
+
+| Area | Notes |
+| --- | --- |
+| **GNOME / Mutter**, **Sway / wlroots** on real hardware | Expected to work. Sway has no `org.freedesktop.ScreenSaver`, so it relies solely on the DRM trigger. |
+| **NVIDIA / Intel GPUs** | Only amdgpu verified. The trigger reads a kernel sysfs node, so it *should* be driver-agnostic. |
+| **Other webOS versions / models** | Only the C2 (webOS 22). Older (webOS 3–6) and newer (C3/C4/G-series) unverified. |
+| **Other distros / non-systemd init** | systemd `--user` is required; nothing else is supported. |
+| **Multi-TV or multi-monitor** setups | Single TV only right now. |
+
+**Known limitations (by design or not built yet):**
+
+- **X11 sessions are not supported** — Wayland only.
+- After a Wake-on-LAN wake the TV may come back on a **different HDMI input**;
+  it's not switched back automatically yet.
+- **Cross-subnet** setups can't work — Wake-on-LAN is layer 2 only, it won't
+  cross a router.
+
+## Feedback
+
+Please open an issue — the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md)
+asks for distro, desktop, GPU, webOS version, and a journal snippet. **"Works on
+my setup" reports are just as valuable as bug reports** — they're how the tested
+list above grows. The goal is for this to be as useful as possible to as many
+setups as possible, and that only happens with reports from setups I can't test
+myself.
+
+## Requirements
+
+- Linux with **systemd** and a **Wayland** session (tested on KDE Plasma 6)
+- **Python ≥ 3.11**
+- **pipx** (to install it cleanly in its own venv)
+- An LG **webOS** TV on the same subnet, with *"Turn on via Wi-Fi"* and
+  *"Quick Start+" / "Always Ready"* enabled in its settings
+
+Runtime Python deps (`websockets`, `dbus-fast`, `pyyaml`) are pulled in
+automatically by the install.
+
+## Install
+
+Full walkthrough, no prior Linux-packaging knowledge assumed:
+**[INSTALL.md](INSTALL.md)**. The short version:
+
+```sh
+pipx install git+https://github.com/jayge91/webos-companion
+webos-companion setup
+```
+
+`setup` scans the network, lists the TVs it finds (IP / MAC / name / model),
+writes `~/.config/webos-companion/config.yaml`, pairs, and installs a
+`systemctl --user` service. Then:
+
+```sh
+systemctl --user status webos-companion
+journalctl --user -u webos-companion -f
+```
+
+Update: `pipx upgrade webos-companion && systemctl --user restart webos-companion`.
+Uninstall: `webos-companion service remove && pipx uninstall webos-companion`.
+
+## How it works
+
+Three trigger sources feed a 3-state machine (`ON` / `SCREEN_OFF` /
+`POWERED_OFF`) driving one persistent WebOS websocket client:
+
+- **`triggers/drm.py`** — polls `/sys/class/drm/<connector>/dpms` (world-readable)
+  every 2 s. The LG panel is auto-detected by EDID vendor id; override with
+  `connector` in the config.
+- **`triggers/logind.py`** — `org.freedesktop.login1` `PrepareForSleep` /
+  `PrepareForShutdown` on the system bus, plus a **delay inhibitor** so the TV is
+  off before the machine actually sleeps.
+- **`triggers/screensaver.py`** — `org.freedesktop.ScreenSaver` `ActiveChanged`
+  on the session bus. **Off by default** (`screensaver_dbus`) — it also fires on
+  a bare lock. Turn it on where the sysfs `dpms` node doesn't move (some
+  compositors). Not provided by Sway.
+
+After a resume, a background recoverer waits for the network, then keeps trying
+Wake-on-LAN + reconnect (with backoff, up to 5 min) until the TV answers.
+
+Everything runs unprivileged.
+
+## Development / testing
+
+```sh
+docker compose run --rm test      # 83 unit tests, ~6s (D-Bus mocked, fake TV server)
+```
+
+Multi-distro build/integration and the compositor / VM checks are in
+**[TESTING.md](TESTING.md)** (`test-distros.sh`, `test-integration.sh`,
+`test-vm.sh` — all containerised, nothing installed on the host).
+
+## Credits
+
+This is a Linux port of **[LGTV Companion](https://github.com/JPersson77/LGTVCompanion)**
+by **Jörgen Persson** (MIT). The daemon is a fresh Python implementation, but it
+is a derivative work:
+
+- `webos_companion/lg_api.py` — the WebOS pairing manifest and the SSAP command
+  URIs are copied from that project's `Common/lg_api.h`.
+- The event → TV-command design, the Wake-on-LAN magic-packet format, and the
+  "blank screen vs. power off" distinction come from studying its
+  `web_os_client.cpp`.
+
+The original is a full-featured Windows application (service + tray UI + CLI +
+API) with years of model-specific handling. If you're on Windows, use that.
+
+This project was **"vibe coded" with [Claude Code](https://claude.com/claude-code)**:
+the architecture choices, the scope, and all real-hardware testing are mine, but
+most of the code was LLM-written. Bug reports and code review from humans are
+especially welcome — see [Feedback](#feedback).
+
+## License
+
+MIT — see [LICENSE](LICENSE). Carries Jörgen Persson's copyright for the
+portions taken from the upstream project, per its MIT terms.

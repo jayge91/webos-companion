@@ -1,0 +1,25 @@
+# Reference systemd --user unit — used by distro packages (installed to
+# /usr/lib/systemd/user/). If you installed with pipx, run instead:
+#     webos-companion service install
+# which writes this unit to ~/.config/systemd/user/ with the correct ExecStart
+# path for your install.
+#
+# Runs unprivileged: session bus for ScreenSaver, system bus for logind,
+# world-readable /sys/class/drm for the dpms state.
+[Unit]
+Description=webOS Companion — follow the display power state on an LG webOS TV
+After=graphical-session.target
+PartOf=graphical-session.target
+# The daemon waits for a route to the TV before doing anything, so no
+# network-online ordering is needed here.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/webos-companion run
+Restart=on-failure
+RestartSec=5
+# Let the daemon finish turning the TV off inside the logind inhibitor window.
+TimeoutStopSec=10
+
+[Install]
+WantedBy=graphical-session.target

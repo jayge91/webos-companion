@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# Linux port of LGTV Companion (github.com/JPersson77/LGTVCompanion), MIT.
+# See LICENSE and the Credits section of README.md.
+name = "webos-companion"
+version = "0.1.0"
+description = "Make an LG WebOS TV follow the display power state on Linux (KDE/Wayland): screen blank, suspend and shutdown."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jonathon McGee" }]
+keywords = ["lg", "webos", "tv", "oled", "kde", "wayland", "systemd", "burn-in"]
+classifiers = [
+    "Environment :: No Input/Output (Daemon)",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "websockets>=12.0",
+    "dbus-fast>=2.21",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.urls]
+Homepage = "https://github.com/jayge91/webos-companion"
+Repository = "https://github.com/jayge91/webos-companion"
+Issues = "https://github.com/jayge91/webos-companion/issues"
+
+[project.scripts]
+webos-companion = "webos_companion.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["webos_companion"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "error::DeprecationWarning:webos_companion",
+    "ignore::DeprecationWarning",
+]

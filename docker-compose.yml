@@ -1,0 +1,57 @@
+# Container-only workflow.
+#
+#   docker compose build                        # first time (or after Dockerfile edits)
+#   docker compose run --rm test                # full unit-test suite (isolated)
+#   docker compose run --rm test -k webos       # a subset
+#
+# Non-destructive HOST checks (read the real DRM sysfs / D-Bus; never install,
+# never hold an inhibitor, never send a power command):
+#
+#   docker compose run --rm hostprobe                         # one-shot snapshot
+#   docker compose run --rm hostprobe run --dry-run -v --seconds 120
+#        ^ watch real display events for 2 min; blank the screen / lock / suspend
+#          and confirm BLANK/UNBLANK/SUSPEND/RESUME are logged.
+#
+# If your host uid/gid is not 1000:
+#   DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose build
+x-build: &build
+  context: .
+  args:
+    UID: "${DOCKER_UID:-1000}"
+    GID: "${DOCKER_GID:-1000}"
+
+services:
+  test:
+    build: *build
+    volumes:
+      - .:/app
+    entrypoint: ["dbus-run-session", "--", "pytest"]
+    command: ["-q"]
+
+  cli:
+    build: *build
+    volumes:
+      - .:/app
+      - ./dev-config:/home/dev/.config/webos-companion
+      - ./dev-state:/home/dev/.local/state/webos-companion
+    entrypoint: ["webos-companion"]
+    command: ["status"]
+
+  # Read-only window onto the real host. Shares the host network namespace and
+  # bind-mounts /sys plus the D-Bus sockets read-only. No packages are installed
+  # on the host; nothing here mutates host state.
+  hostprobe:
+    build: *build
+    network_mode: host
+    volumes:
+      - .:/app
+      - /sys:/sys:ro
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/bus:/run/user/host/bus
+      - ./dev-config:/home/dev/.config/webos-companion
+      - ./dev-state:/home/dev/.local/state/webos-companion
+    environment:
+      DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/host/bus"
+      XDG_RUNTIME_DIR: "/run/user/host"
+    entrypoint: ["webos-companion"]
+    command: ["probe"]

@@ -1,0 +1,24 @@
+# Maintainer: (your name) <you@example.com>
+pkgname=webos-companion
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Make an LG WebOS TV follow the local display power state on KDE/Wayland"
+arch=('any')
+url="https://github.com/jayge91/webos-companion"
+license=('MIT')
+depends=('python' 'python-websockets' 'python-dbus-fast')
+makedepends=('python-build' 'python-installer' 'python-hatchling' 'python-wheel')
+source=()  # build from the linux/ subdirectory of a checkout
+
+build() {
+    cd "$startdir"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$startdir"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+    install -Dm644 systemd/webos-companion.service \
+        "$pkgdir/usr/lib/systemd/user/webos-companion.service"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+# local dev config / pairing key used by the docker `cli` and `hostprobe` services
+dev-config/
+dev-state/
+vm-scratch
