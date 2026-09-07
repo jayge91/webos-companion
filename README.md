@@ -9,9 +9,9 @@ A Linux port of [**LGTV Companion**](https://github.com/JPersson77/LGTVCompanion
 (Windows) — see [Credits](#credits).
 
 > **Status: early (0.1).** Verified end-to-end on one setup (KDE Plasma 6 /
-> Wayland, one LG C2). Lots of common configurations are untested — see
-> [Project status](#project-status--whats-tested) below. **Feedback is very
-> welcome and genuinely useful**, including "it just works on X".
+> Wayland, one LG C2). Lots of common configurations are untested, and there are
+> real limitations — see [Project status](#project-status) below. **Feedback is
+> very welcome and genuinely useful**, including "it just works on X".
 
 | When your desktop… | …the TV does |
 | --- | --- |
@@ -24,7 +24,7 @@ A Linux port of [**LGTV Companion**](https://github.com/JPersson77/LGTVCompanion
 User-idle handling is left to the desktop. A bare session lock is deliberately
 *not* a trigger (the screen-blank that usually follows one is).
 
-## Project status — what's tested
+## Project status
 
 This is a one-person 0.1 built and run against a single real setup. It was
 **"vibe coded" with [Claude Code](https://claude.com/claude-code)** — the design
@@ -60,15 +60,55 @@ desktop / GPU" is largely unverified. Here's the honest state:
 | **NVIDIA / Intel GPUs** | Only amdgpu verified. The trigger reads a kernel sysfs node, so it *should* be driver-agnostic. |
 | **Other webOS versions / models** | Only the C2 (webOS 22). Older (webOS 3–6) and newer (C3/C4/G-series) unverified. |
 | **Other distros / non-systemd init** | systemd `--user` is required; nothing else is supported. |
-| **Multi-TV or multi-monitor** setups | Single TV only right now. |
 
-**Known limitations (by design or not built yet):**
+### Limitations — by design
 
-- **X11 sessions are not supported** — Wayland only.
-- After a Wake-on-LAN wake the TV may come back on a **different HDMI input**;
-  it's not switched back automatically yet.
-- **Cross-subnet** setups can't work — Wake-on-LAN is layer 2 only, it won't
-  cross a router.
+- **User-idle and the lock screen are out of scope** — deciding *when* to blank
+  is the desktop's job; this reacts only to the blank itself, not to idle timers
+  or a bare session lock.
+- **X11 sessions are not supported** — the screen-off trigger reads Wayland/KMS
+  state. Wayland + systemd only; no support for other init systems.
+- **One layer-2 segment** — Wake-on-LAN is a broadcast frame, so the PC and TV
+  must share a subnet. It can't cross a router or VLAN.
+- **TLS to the TV is not verified** (`CERT_NONE`) — webOS TVs serve self-signed
+  certs; every webOS client does this. The pairing key is stored in plain text
+  at `~/.local/state/webos-companion/client-key` (mode `0600`).
+
+### Limitations — not built yet / rough edges
+
+- **One TV, one display connector.** The config holds a single TV, and the DRM
+  watcher follows a single connector. No multi-TV support and no
+  monitor-topology awareness — in a multi-monitor setup it reacts only to the
+  connector it's watching, regardless of the others.
+- **Two LG panels confuse auto-detect.** The LG panel is found by EDID vendor
+  ID; with more than one, it logs a warning and guesses. Set `connector` in
+  `config.yaml` to be explicit.
+- **The screen-off trigger is a ~2 s poll**, not an event — so there's up to
+  ~2 s of latency, and an off→on flip inside one interval is missed.
+- **No HDMI input switching.** After a Wake-on-LAN wake the TV may come back on
+  a different input; it's not switched back.
+- **Post-resume recovery gives up after 5 minutes.** If the network or TV takes
+  longer than that to come back, the TV is left as-is until the next event.
+- **Barely any model-specific handling.** Tested only on a C2 (webOS 22); the
+  set of "panel is awake" power states is a guess for other firmware. If the TV
+  un-pairs this PC, re-pair with `webos-companion pair`.
+
+## Roadmap
+
+Rough priority order. Issues and PRs welcome on any of these.
+
+| Planned | Status |
+| --- | --- |
+| Real GNOME/Mutter + Sway/wlroots verification on hardware | needs testers |
+| Wider webOS version / model coverage | needs "works on X" reports |
+| HDMI input restore after a Wake-on-LAN wake | not started |
+| AUR package (a `PKGBUILD` already exists) and a PyPI release | not started |
+| Tagged GitHub releases and a changelog | not started |
+| Event-driven (udev) DRM watch instead of the 2 s poll | idea |
+| Multi-TV / per-connector configuration | idea — depends on demand |
+
+Not planned: user-idle handling, X11, cross-subnet Wake-on-LAN (see the
+by-design limitations above).
 
 ## Feedback
 

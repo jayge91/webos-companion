@@ -8,8 +8,8 @@ from source before. Every command is meant to be copy‑pasted into a terminal
 > **systemd + Wayland** desktop (GNOME, etc.) and any distro with
 > **Python ≥ 3.11** — but a lot of that is unverified on real hardware, so if you
 > try one, please open an issue with how it went (see the
-> [Project status](README.md#project-status--whats-tested) table for what's
-> actually been checked). X11-only sessions are not supported.
+> [Project status](README.md#project-status) section for what's actually been
+> checked and the known limitations). X11-only sessions are not supported.
 >
 > The documented `pipx install` below is verified on Arch, Debian 12,
 > Ubuntu 24.04, Fedora 41, and openSUSE Tumbleweed.
@@ -194,6 +194,7 @@ If you'd rather not use the wizard:
   mac: "80:5b:65:a1:b2:c3"  # your TV's MAC address        (required, for wake-on-LAN)
   connector: ""             # "" = auto-detect the LG panel; or e.g. "HDMI-A-1"
   ssl: true                 # secure port 3001 (leave true for modern TVs)
+  port: 0                   # 0 = 3001 (ssl) / 3000 (plain); override only if needed
   poll_interval: 2.0        # seconds between display-power checks
   screensaver_dbus: false   # true = also react to screen lock (usually not wanted)
   wol_broadcast: "255.255.255.255"
@@ -228,7 +229,7 @@ pipx upgrade webos-companion
 systemctl --user restart webos-companion
 ```
 
-If the systemd unit itself changed (rare — check the release notes), also run
+If the systemd unit itself changed (rare), also run
 `webos-companion service install` again to refresh it.
 
 ---
@@ -278,6 +279,18 @@ journalctl --user -u webos-companion -e
 ```
 A `config error` line means `~/.config/webos-companion/config.yaml` is missing or
 has no `ip`.
+
+**It's following the wrong screen (I have more than one monitor)**
+Auto-detect picks the LG panel by its EDID, but if you have two LG displays — or
+want it to track a specific output — run `webos-companion discover` / check
+`ls /sys/class/drm` for the connector name (e.g. `HDMI-A-1`), then set
+`connector: "HDMI-A-1"` in `~/.config/webos-companion/config.yaml` and restart.
+The daemon follows exactly one connector; it has no multi-monitor awareness.
+
+**Pairing suddenly stopped working / the TV asks to pair again**
+The TV dropped its trust for this PC (a reset, a firmware update, or clearing
+"Mobile TV On" devices). Re-pair with `webos-companion pair` and accept the
+prompt on the TV.
 
 **The TV doesn't blank when my screen turns off (but does on lock)**
 Turn your screen off and back on, then look at the log:
