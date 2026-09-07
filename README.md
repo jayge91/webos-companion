@@ -8,11 +8,7 @@ protection and a bit of power saving.
 A Linux port of [**LGTV Companion**](https://github.com/JPersson77/LGTVCompanion)
 (Windows) — see [Credits](#credits).
 
-<!-- DEMO GIF — replace this comment with:
-     ![webOS Companion turning the TV off when the screen blanks](docs/demo.gif)
-     A ~10s clip: desktop goes idle -> TV panel clicks off -> wake -> it's back.
-     Record with a phone (TV + monitor in frame) or asciinema for the journal side.
-     Put the file at docs/demo.gif and commit it. -->
+![webOS Companion turning the LG OLED off when the screen blanks, then back on](docs/demo.gif)
 
 
 > **Status: early (0.1).** Verified end-to-end on one setup (KDE Plasma 6 /
