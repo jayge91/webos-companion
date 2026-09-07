@@ -122,6 +122,27 @@ def test_send_wol_targets_broadcast_and_ip():
     assert len(pkt) == 102
     assert ("255.255.255.255", 9) in targets
     assert ("192.168.1.42", 9) in targets
+    assert ("255.255.255.255", 7) in targets  # also the legacy WOL port
+
+
+async def test_send_wol_burst_sends_several():
+    sent: list = []
+    c = WebOsClient(
+        "192.168.1.42",
+        mac="ab:cd:ef:12:34:56",
+        udp_sender=lambda pkt, targets: sent.append(pkt),
+    )
+    await c.send_wol_burst(count=4, spacing=0)
+    assert len(sent) == 4
+
+
+async def test_ensure_on_force_unblank_unblanks_even_when_active():
+    async with FakeTV(known_key="k", power_state="Active") as tv:
+        c = _client(tv, client_key="k")
+        await c.connect(pair_timeout=5)
+        await c.ensure_on(allow_wol=False, force_unblank=True)
+        await c.close()
+    assert tv.uris[-1].endswith("turnOnScreen")
 
 
 async def test_ensure_on_unblanks_when_screen_is_off():

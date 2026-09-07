@@ -80,14 +80,26 @@ class Daemon:
             self._state = State.SCREEN_OFF
 
     async def _on_unblank(self) -> None:
-        self._cancel_recovery()
         if self._state is State.ON:
+            self._cancel_recovery()
+            return
+        # A recovery already running (e.g. we just resumed and it's WoL-ing the
+        # TV back) owns this — don't start a competing attempt.
+        if self._recovery is not None and not self._recovery.done():
+            return
+        if self._state is State.POWERED_OFF:
+            # Local screen came on but the TV is fully off — full recovery path
+            # (WoL burst + resilient unblank), same as a resume.
+            log.info("display on while the TV is powered off -> bringing it back")
+            self._start_recovery(resume=True)
             return
         log.info("display on -> turning the TV screen on")
-        if await self._run(self.client.ensure_on(), timeout=self._action_timeout * 3):
+        if await self._run(
+            self.client.ensure_on(force_unblank=True), timeout=self._action_timeout * 3
+        ):
             await self._settle_awake()
         else:
-            self._start_recovery()
+            self._start_recovery(resume=True)
 
     async def _on_suspend(self) -> None:
         self._cancel_recovery()
@@ -105,15 +117,10 @@ class Daemon:
     async def _on_resume(self) -> None:
         self._cancel_recovery()
         log.info("system resumed -> bringing the TV back on")
-        # One quick attempt (short wait for the NIC, which is usually still
-        # coming up right after wake); on failure hand off to the recoverer.
-        if await self._run(
-            self.client.ensure_on(wol_attempts=1, network_wait=3.0),
-            timeout=self._action_timeout,
-        ):
-            await self._settle_awake()
-        else:
-            self._start_recovery()
+        # The NIC is almost always still coming up, so there's no point in a
+        # foreground attempt — go straight to the network-gated recoverer, which
+        # bursts Wake-on-LAN the moment a route appears.
+        self._start_recovery(resume=True)
 
     # -- helpers -------------------------------------------------------
 
@@ -125,45 +132,67 @@ class Daemon:
                 return
         self._state = State.ON
 
-    def _start_recovery(self) -> None:
+    def _start_recovery(self, *, resume: bool = False) -> None:
         self._cancel_recovery()
-        self._recovery = asyncio.create_task(self._recover(), name="tv-recovery")
+        self._recovery = asyncio.create_task(
+            self._recover(resume=resume), name="tv-recovery"
+        )
 
     def _cancel_recovery(self) -> None:
         if self._recovery is not None and not self._recovery.done():
             self._recovery.cancel()
         self._recovery = None
 
-    async def _recover(self) -> None:
+    async def _recover(self, *, resume: bool = False) -> None:
         """Keep trying to bring the TV online until it works or the budget runs out."""
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self._recover_budget
-        delay = 3.0
+        start = loop.time()
+        deadline = start + self._recover_budget
         log.info(
-            "TV unreachable; retrying in the background for up to %.0fs",
-            self._recover_budget,
+            "bringing the TV back; retrying for up to %.0fs", self._recover_budget
         )
         # Don't send WOL or open sockets until the local network can route to
         # the TV (the NIC is usually still coming up right after resume).
         if not await self.client.wait_for_network(self._recover_budget):
             log.warning("network never came back; giving up on the TV")
             return
+        can_wol = resume and bool(self.client.mac)
+        last_wol = -999.0
+        attempt = 0
         while loop.time() < deadline:
+            attempt += 1
+            # Re-burst Wake-on-LAN every few seconds until we get through — the
+            # TV can miss the first packets while its NIC is still coming up.
+            if can_wol and loop.time() - last_wol >= 4.0:
+                await self.client.send_wol_burst()
+                last_wol = loop.time()
             try:
                 await asyncio.wait_for(
-                    self.client.ensure_on(wol_attempts=1, wol_interval=1.5),
-                    timeout=25.0,
+                    self.client.ensure_on(
+                        allow_wol=False,
+                        force_unblank=resume,
+                        connect_timeout=3.0,
+                    ),
+                    timeout=12.0,
                 )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
-                log.debug("recovery attempt failed: %s", exc)
+                # tight cadence for the first ~20s (the TV is still booting),
+                # then ease off so a long outage isn't a busy-loop.
+                delay = 1.0 if loop.time() - start < 20 else 5.0
+                log.debug(
+                    "recovery attempt %d failed (%s: %s); retrying in %.0fs",
+                    attempt, type(exc).__name__, exc, delay,
+                )
                 await asyncio.sleep(delay)
-                delay = min(delay * 1.5, 8.0)
                 continue
             async with self._lock:
                 await self._settle_awake()
-                log.info("TV recovered -> state %s", self._state.name)
+                log.info(
+                    "TV recovered -> state %s (%d attempt(s), %.1fs)",
+                    self._state.name, attempt, loop.time() - start,
+                )
             return
         log.warning("gave up bringing the TV back after %.0fs", self._recover_budget)
 

@@ -11,9 +11,13 @@ class StubClient:
         self.calls: list[str] = []
         self.fail = fail or set()
         self.network_up = network_up
+        self.mac = "aa:bb:cc:dd:ee:ff"
 
     async def wait_for_network(self, timeout, **kw) -> bool:
         return self.network_up
+
+    async def send_wol_burst(self, **kw) -> None:
+        pass  # WoL bursting is exercised in test_webos.py, not here
 
     async def _do(self, name: str) -> None:
         self.calls.append(name)
@@ -93,6 +97,8 @@ async def test_resume_to_lit_screen():
     c = StubClient()
     d = _daemon(c, dpms="On", state=State.POWERED_OFF)
     await d.dispatch(Event.RESUME)
+    # resume always hands off to the background recoverer now
+    await asyncio.wait_for(d._recovery, timeout=5)
     assert c.calls == ["ensure_on"]
     assert d.state is State.ON
 
@@ -101,6 +107,7 @@ async def test_resume_into_still_blanked_screen():
     c = StubClient()
     d = _daemon(c, dpms="Off", state=State.POWERED_OFF)
     await d.dispatch(Event.RESUME)
+    await asyncio.wait_for(d._recovery, timeout=5)
     assert c.calls == ["ensure_on", "off"]
     assert d.state is State.SCREEN_OFF
 
@@ -135,7 +142,7 @@ async def test_resume_failure_starts_recovery_that_later_succeeds():
     c = StubClient(fail={"ensure_on"})
     d = _daemon(c, state=State.POWERED_OFF)
     await d.dispatch(Event.RESUME)
-    # inline attempt failed -> still powered-off, recovery running in background
+    # still powered-off, recovery running in the background
     assert d.state is State.POWERED_OFF
     assert d._recovery is not None and not d._recovery.done()
 
@@ -176,6 +183,27 @@ async def test_unblank_failure_starts_recovery():
     await d.aclose()
 
 
+async def test_unblank_while_powered_off_goes_to_recovery():
+    c = StubClient(fail={"ensure_on"})
+    d = _daemon(c, state=State.POWERED_OFF)
+    await d.dispatch(Event.UNBLANK)
+    # no inline ensure_on — straight to the WoL recovery path
+    assert "ensure_on" not in c.calls
+    assert d._recovery is not None and not d._recovery.done()
+    await d.aclose()
+
+
+async def test_unblank_does_not_disturb_a_running_recovery():
+    c = StubClient(fail={"ensure_on"})
+    d = _daemon(c, state=State.POWERED_OFF)
+    await d.dispatch(Event.RESUME)
+    recovery = d._recovery
+    assert recovery is not None
+    await d.dispatch(Event.UNBLANK)  # the DRM trigger also fires on resume
+    assert d._recovery is recovery  # same task, not replaced
+    await d.aclose()
+
+
 async def test_recovery_gives_up_if_network_never_returns():
     c = StubClient(fail={"ensure_on"}, network_up=False)
     d = _daemon(c, state=State.POWERED_OFF)
@@ -183,5 +211,5 @@ async def test_recovery_gives_up_if_network_never_returns():
     assert d._recovery is not None
     await asyncio.wait_for(d._recovery, timeout=2)
     # never even attempted to reach the TV
-    assert "ensure_on" not in c.calls[1:]  # calls[0] is the inline resume attempt
+    assert "ensure_on" not in c.calls
     assert d.state is State.POWERED_OFF
