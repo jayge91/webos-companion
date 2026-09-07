@@ -4,10 +4,15 @@ This guide is written for someone who has **not** installed a Linux application
 from source before. Every command is meant to be copy‑pasted into a terminal
 (on KDE that's **Konsole**; on GNOME, **Terminal** — or press `Ctrl`+`Alt`+`T`).
 
-> **Tested on:** KDE Plasma 6 / Wayland. It *should* work on any **systemd +
-> Wayland** desktop (GNOME, etc.) and any distro with **Python ≥ 3.11** — those
-> haven't been tested on real hardware yet, so if you try one, please open an
-> issue with how it went. X11-only sessions are not supported.
+> **Tested on:** KDE Plasma 6 / Wayland with an LG C2. It *should* work on any
+> **systemd + Wayland** desktop (GNOME, etc.) and any distro with
+> **Python ≥ 3.11** — but a lot of that is unverified on real hardware, so if you
+> try one, please open an issue with how it went (see the
+> [Project status](README.md#project-status--whats-tested) table for what's
+> actually been checked). X11-only sessions are not supported.
+>
+> The documented `pipx install` below is verified on Arch, Debian 12,
+> Ubuntu 24.04, Fedora 41, and openSUSE Tumbleweed.
 
 ---
 
@@ -150,6 +155,8 @@ webos-companion status
 Expected:
 
 ```
+config:     /home/you/.config/webos-companion/config.yaml
+tv:         192.168.1.42  mac=80:5b:65:a1:b2:c3  ssl=True
 paired:     yes
 connector:  card1-HDMI-A-1  dpms=On
 tv power:   Active
