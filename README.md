@@ -45,6 +45,8 @@ desktop / GPU" is largely unverified. Here's the honest state:
 
 - Full unit suite (83 tests) on **Python 3.11–3.14**, on Arch, Debian 12,
   Ubuntu 24.04, Fedora 41, openSUSE Tumbleweed (D-Bus mocked, fake TV server).
+- The documented `pipx install git+URL` path + CLI entry point, on those same
+  five distros, from the published repo (`test-install.sh`).
 - Real host D-Bus / DRM paths and live TV *discovery* from Debian / Ubuntu /
   Fedora / openSUSE userspace (tier 2 in [TESTING.md](TESTING.md)).
 - A non-KWin compositor (**weston**, in a VM) flips `/sys/class/drm/*/dpms` on
@@ -137,7 +139,9 @@ Everything runs unprivileged.
 docker compose run --rm test      # 83 unit tests, ~6s (D-Bus mocked, fake TV server)
 ```
 
-Multi-distro build/integration and the compositor / VM checks are in
+The documented `pipx install` path is checked on Arch / Debian 12 / Ubuntu 24.04
+/ Fedora 41 / openSUSE Tumbleweed by `./test-install.sh` (against the published
+repo). Multi-distro build/integration and the compositor / VM checks are in
 **[TESTING.md](TESTING.md)** (`test-distros.sh`, `test-integration.sh`,
 `test-vm.sh` — all containerised, nothing installed on the host).
 

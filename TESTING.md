@@ -6,10 +6,36 @@ the host.
 
 | Tier | Script | What it proves |
 | --- | --- | --- |
-| 1 | `./test-distros.sh` | builds + the full unit suite on 6 distros |
+| 0 | `./test-install.sh` | the **INSTALL.md** end-user path (`pipx install git+URL` + CLI) on 5 distros, from the *published* repo |
+| 1 | `./test-distros.sh` | builds + the full unit suite on 6 distros, from a local checkout |
 | 2 | `./test-integration.sh <distro> [cmd]` | the daemon's real D-Bus / DRM / TV paths, using another distro's Python stack against **this** host |
 | 3a | *(notes below)* | which screen-off trigger a given compositor supports |
 | 3b | `./test-vm.sh` | does `/sys/class/drm/*/dpms` flip under a non-KWin Wayland compositor |
+
+---
+
+## Tier 0 — the documented install path
+
+```sh
+./test-install.sh                 # all 5 distros, from github.com/jayge91/webos-companion
+./test-install.sh fedora          # one
+REPO=git+https://github.com/you/webos-companion@wip ./test-install.sh   # a branch
+```
+
+Each container runs *exactly* what INSTALL.md Step 1–3 tells a user to run — the
+distro's `pipx` + `git` packages, then `pipx install <REPO>` — and checks the
+`webos-companion` entry point resolves (`--version`, `--help`), that `setup`
+exits cleanly with "interactive" when there's no TTY, and that `status` runs.
+No pairing, no TV. This is the "does a stranger's `pipx install` line work"
+check; Tier 1 covers the build from a local tree.
+
+| Distro | Python | `pipx` pkg | Result |
+| --- | --- | --- | --- |
+| Arch (`archlinux:base`) | 3.14 | `python-pipx` | **PASS** |
+| Debian 12 | 3.11 | `pipx` | **PASS** |
+| Ubuntu 24.04 | 3.12 | `pipx` | **PASS** |
+| Fedora 41 | 3.13 | `pipx` | **PASS** |
+| openSUSE Tumbleweed | 3.13 | `python3-pipx` | **PASS** |
 
 ---
 
