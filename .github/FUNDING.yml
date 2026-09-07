@@ -1,0 +1,6 @@
+# Shows the "Sponsor" button on the repo.
+# PayPal (and similar) go under `custom` as full URLs.
+custom: ["https://paypal.me/JonathonMcGee495"]
+
+# If you enable GitHub Sponsors on your account later, add:
+# github: [jayge91]

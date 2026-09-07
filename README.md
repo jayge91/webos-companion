@@ -8,6 +8,13 @@ protection and a bit of power saving.
 A Linux port of [**LGTV Companion**](https://github.com/JPersson77/LGTVCompanion)
 (Windows) — see [Credits](#credits).
 
+<!-- DEMO GIF — replace this comment with:
+     ![webOS Companion turning the TV off when the screen blanks](docs/demo.gif)
+     A ~10s clip: desktop goes idle -> TV panel clicks off -> wake -> it's back.
+     Record with a phone (TV + monitor in frame) or asciinema for the journal side.
+     Put the file at docs/demo.gif and commit it. -->
+
+
 > **Status: early (0.1).** Verified end-to-end on one setup (KDE Plasma 6 /
 > Wayland, one LG C2). Lots of common configurations are untested, and there are
 > real limitations — see [Project status](#project-status) below. **Feedback is
@@ -103,8 +110,8 @@ Rough priority order. Issues and PRs welcome on any of these.
 | Real GNOME/Mutter + Sway/wlroots verification on hardware | needs testers |
 | Wider webOS version / model coverage | needs "works on X" reports |
 | HDMI input restore after a Wake-on-LAN wake | not started |
-| AUR package (a `PKGBUILD` already exists) and a PyPI release | not started |
-| Tagged GitHub releases and a changelog | not started |
+| AUR package | `packaging/PKGBUILD` ready — needs the `v0.1.0` tag pushed |
+| PyPI release | not started |
 | Event-driven (udev) DRM watch instead of the 2 s poll | idea |
 | Multi-TV / per-connector configuration | idea — depends on demand |
 
@@ -205,6 +212,15 @@ This project was **"vibe coded" with [Claude Code](https://claude.com/claude-cod
 the architecture choices, the scope, and all real-hardware testing are mine, but
 most of the code was LLM-written. Bug reports and code review from humans are
 especially welcome — see [Feedback](#feedback).
+
+## Support
+
+If this saved your panel, you can [buy me a coffee](https://paypal.me/JonathonMcGee495).
+It goes toward the hardware this is tested on and time spent on issues and
+compatibility reports — no pressure, the software is free either way.
+
+Please also consider supporting **[Jörgen Persson](https://www.paypal.me/jpersson77)**,
+who wrote the original LGTV Companion this is a port of.
 
 ## License
 

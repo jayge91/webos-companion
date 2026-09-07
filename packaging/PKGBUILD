@@ -1,9 +1,10 @@
 # Maintainer: Jonathon McGee <jayge91@gmail.com>
 #
-# Local-build PKGBUILD: run `makepkg` from a checkout with this file copied to
-# the repo root (or `makepkg -p packaging/PKGBUILD` from the root). Before this
-# can go to the AUR it needs a real `source=(...archive/v$pkgver.tar.gz)` and a
-# matching git tag — see the Roadmap in README.md.
+# AUR submission checklist:
+#   1. push the v$pkgver git tag (GitHub then serves the source tarball below)
+#   2. run `updpkgsums` in this directory to fill in sha256sums
+#   3. `makepkg --printsrcinfo > .SRCINFO`
+#   4. push PKGBUILD + .SRCINFO to the AUR repo
 pkgname=webos-companion
 pkgver=0.1.0
 pkgrel=1
@@ -14,20 +15,21 @@ license=('MIT')
 depends=('python' 'python-websockets' 'python-dbus-fast' 'python-yaml')
 makedepends=('python-build' 'python-installer' 'python-hatchling' 'python-wheel')
 checkdepends=('python-pytest' 'python-pytest-asyncio' 'dbus')
-source=()
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # replace with `updpkgsums` once the tag is pushed
 
 build() {
-    cd "$startdir"
+    cd "$srcdir/$pkgname-$pkgver"
     python -m build --wheel --no-isolation
 }
 
 check() {
-    cd "$startdir"
+    cd "$srcdir/$pkgname-$pkgver"
     dbus-run-session -- python -m pytest -q
 }
 
 package() {
-    cd "$startdir"
+    cd "$srcdir/$pkgname-$pkgver"
     python -m installer --destdir="$pkgdir" dist/*.whl
     install -Dm644 systemd/webos-companion.service \
         "$pkgdir/usr/lib/systemd/user/webos-companion.service"
